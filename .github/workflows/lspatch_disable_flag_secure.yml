@@ -47,6 +47,20 @@ jobs:
         run: |
           set -euxo pipefail
 
+          release_asset_url() {
+            local repo="$1"
+            local jq_filter="$2"
+            local url
+
+            url="$(curl -fsSL "https://api.github.com/repos/${repo}/releases/latest" | jq -r "$jq_filter")"
+            if [ -z "$url" ] || [ "$url" = "null" ]; then
+              echo "Failed to resolve release asset for ${repo}" >&2
+              exit 1
+            fi
+
+            printf '%s\n' "$url"
+          }
+
           echo "app_id=${{ github.event.inputs.app_id }}"
           echo "apk_url=${{ github.event.inputs.apk_url }}"
           echo "download_source=${{ github.event.inputs.download_source }}"
@@ -55,15 +69,15 @@ jobs:
 
           BASENAME="patched"
 
-          LSPATCH_URL=$(curl -s https://api.github.com/repos/JingMatrix/LSPatch/releases/latest | jq -r '.assets[] | select(.name=="lspatch.jar") | .browser_download_url')
+          LSPATCH_URL=$(release_asset_url "JingMatrix/LSPatch" '.assets[] | select(.name == "lspatch.jar" or (.name | test("^lspatch-.*-release\\.jar$"))) | .browser_download_url' | head -n 1)
           echo "LSPATCH_URL=$LSPATCH_URL"
           wget -O lspatch.jar "$LSPATCH_URL"
 
-          MODULE_URL=$(curl -s https://api.github.com/repos/Xposed-Modules-Repo/com.varuns2002.disable_flag_secure/releases/latest | jq -r '.assets[] | select(.name | test("^Xposed-Disable-FLAG_SECURE_.*\\.apk$")) | .browser_download_url')
+          MODULE_URL=$(release_asset_url "Xposed-Modules-Repo/com.varuns2002.disable_flag_secure" '.assets[] | select(.name | test("^Xposed-Disable-FLAG_SECURE_.*\\.apk$")) | .browser_download_url' | head -n 1)
           echo "MODULE_URL=$MODULE_URL"
           wget -O Xposed-Disable-FLAG_SECURE.apk "$MODULE_URL"
 
-          APKEEP_URL=$(curl -s https://api.github.com/repos/EFForg/apkeep/releases/latest | jq -r '.assets[] | select(.name=="apkeep-x86_64-unknown-linux-gnu") | .browser_download_url')
+          APKEEP_URL=$(release_asset_url "EFForg/apkeep" '.assets[] | select(.name=="apkeep-x86_64-unknown-linux-gnu") | .browser_download_url' | head -n 1)
           echo "APKEEP_URL=$APKEEP_URL"
           wget -O apkeep "$APKEEP_URL"
 
@@ -100,7 +114,7 @@ jobs:
           fi
 
           if ! file apk_download/* | grep -q "Android package (APK)"; then
-            APKEDITOR_URL=$(curl -s https://api.github.com/repos/REAndroid/APKEditor/releases/latest | jq -r '.assets[] | select(.name | test("^APKEditor-.*\\.jar$")) | .browser_download_url')
+            APKEDITOR_URL=$(release_asset_url "REAndroid/APKEditor" '.assets[] | select(.name | test("^APKEditor-.*\\.jar$")) | .browser_download_url' | head -n 1)
             echo "APKEDITOR_URL=$APKEDITOR_URL"
             wget -O APKEditor.jar "$APKEDITOR_URL"
 
